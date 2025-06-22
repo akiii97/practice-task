@@ -8,12 +8,13 @@ from typing import Any, Iterator, List, Optional
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
+import requests
 
 app = FastAPI()
 
 TOTAL_PAGES: int = random.randint(500, 600)
 PAGE_SIZE: int = 10
-CHAOS_PERCENT: int = 2
+CHAOS_PERCENT: int = 0
 
 
 class BaseAnimal(BaseModel):
@@ -114,3 +115,31 @@ async def chaos_middleware(request: Request, call_next):
             await asyncio.sleep(random.randint(5, 15))
 
     return await call_next(request)
+
+
+BASE_URL = "http://localhost:3123"  # can bve changed to whatever port server runs on
+
+def fetch_all_animals():
+    animals = []
+    page = 1
+
+    response = requests.get(f"{BASE_URL}/animals/v1/animals", params={"page": page})
+    response.raise_for_status()
+    data = response.json()
+    animals.extend(data["items"])
+    total_pages = data["total_pages"]
+
+    for page in range(2, total_pages + 1):
+        response = requests.get(f"{BASE_URL}/animals/v1/animals", params={"page": page})
+        response.raise_for_status()
+        data = response.json()
+        animals.extend(data["items"])
+
+    return animals
+
+if __name__ == "__main__":
+    all_animals = fetch_all_animals()
+    print(f"Fetched {len(all_animals)} animals.")
+    # Print the first 5 animals as a sample
+    for animal in all_animals[:5]:
+        print(animal)

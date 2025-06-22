@@ -135,11 +135,17 @@ def fetch_all_animals():
         data = response.json()
         animals.extend(data["items"])
 
-    return animals
+    return [animal["id"] for animal in animals]
+
+def get_animal_details(animal_id):
+    response = requests.get(f"{BASE_URL}/animals/v1/animals/{animal_id}")
+    response.raise_for_status()
+    return response.json()
 
 if __name__ == "__main__":
-    all_animals = fetch_all_animals()
-    print(f"Fetched {len(all_animals)} animals.")
-    # Print the first 5 animals as a sample
-    for animal in all_animals[:5]:
-        print(animal)
+    all_ids = fetch_all_animals()
+    print(f"Fetched {len(all_ids)} animal ids.")
+
+    for animal_id in all_ids[:10]:
+        details = get_animal_details(animal_id)
+        print(details)

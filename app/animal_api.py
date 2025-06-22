@@ -45,7 +45,7 @@ class Animals(ListingMeta):
 def generate_animals() -> Iterator[Animal]:
     now = int(time.time() * 1000)
 
-    with open("animals.json") as f:
+    with open(os.path.join(os.path.dirname(__file__), "animals.json")) as f:
         animal_names = json.load(f)
 
     for i in range(TOTAL_PAGES * PAGE_SIZE):

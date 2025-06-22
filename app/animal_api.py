@@ -20,11 +20,11 @@ CHAOS_PERCENT: int = 0
 class BaseAnimal(BaseModel):
     id: int
     name: str
-    born_at: Optional[int]
+    born_at: Optional[datetime.datetime]
 
 
 class Animal(BaseAnimal):
-    friends: str
+    friends: List[str]
 
 
 class IncomingAnimal(BaseAnimal):
@@ -51,13 +51,13 @@ def generate_animals() -> Iterator[Animal]:
     for i in range(TOTAL_PAGES * PAGE_SIZE):
         born_at = None
         if random.randint(0, 5) == 1:
-            born_at = random.randint(536461200 * 1000, now)
-
+            ms = random.randint(536461200 * 1000, now)
+            born_at = datetime.datetime.utcfromtimestamp(ms / 1000)
         yield Animal(
             id=i,
             name=random.choice(animal_names),
             born_at=born_at,
-            friends=",".join(random.sample(animal_names, random.randint(0, 5))),
+            friends=random.sample(animal_names, random.randint(0, 5)),
         )
 
 
@@ -72,17 +72,27 @@ def get_animals(page: int = 1):
     start_index = PAGE_SIZE * (page - 1)
     end_index = start_index + PAGE_SIZE
     animals = ANIMALS[start_index:end_index]
-    animals = [a.dict(exclude={"friends"}) for a in animals]
-    return Animals(
-        items=animals,
-        page=page,
-        total_pages=TOTAL_PAGES,
-    )
+    transformed = []
+    for a in animals:
+        animal = a.dict()
+        if animal.get("born_at") is not None and isinstance(animal["born_at"], int):
+            dt = datetime.datetime.utcfromtimestamp(animal["born_at"] / 1000)
+            animal["born_at"] = dt.replace(microsecond=0).isoformat() + "Z"
+        transformed.append(animal)
+    return {
+        "items": transformed,
+        "page": page,
+        "total_pages": TOTAL_PAGES,
+    }
 
 
 @app.get("/animals/v1/animals/{animal_id}", response_model=Animal)
 def get_animal(animal_id: int):
-    return ANIMALS[animal_id]
+    animal = ANIMALS[animal_id].dict()
+    if animal.get("born_at") is not None and isinstance(animal["born_at"], int):
+        dt = datetime.datetime.utcfromtimestamp(animal["born_at"] / 1000)
+        animal["born_at"] = dt.replace(microsecond=0).isoformat() + "Z"
+    return animal
 
 
 @app.post("/animals/v1/home")
@@ -135,17 +145,21 @@ def fetch_all_animals():
         data = response.json()
         animals.extend(data["items"])
 
-    return [animal["id"] for animal in animals]
+    return animals
 
 def get_animal_details(animal_id):
     response = requests.get(f"{BASE_URL}/animals/v1/animals/{animal_id}")
     response.raise_for_status()
-    return response.json()
+    animal = response.json()
+    # Transform born_at to ISO8601 UTC if present
+    if animal.get("born_at") is not None and isinstance(animal["born_at"], int):
+        dt = datetime.datetime.utcfromtimestamp(animal["born_at"] / 1000)
+        animal["born_at"] = dt.replace(microsecond=0).isoformat() + "Z"
+    return animal
 
 if __name__ == "__main__":
-    all_ids = fetch_all_animals()
-    print(f"Fetched {len(all_ids)} animal ids.")
-
-    for animal_id in all_ids[:10]:
-        details = get_animal_details(animal_id)
-        print(details)
+    all_animals = fetch_all_animals()
+    print(f"Fetched {len(all_animals)} animals.")
+    # Print the first 5 animals as a sample
+    for animal in all_animals[:5]:
+        print(animal)

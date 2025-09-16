@@ -83,6 +83,7 @@ def get_animals(page: int = 1):
         "items": transformed,
         "page": page,
         "total_pages": TOTAL_PAGES,
+        #hi
     }
 
 
